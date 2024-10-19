@@ -115,3 +115,23 @@ xv = xv.view(b, seq_len, num_kv_heads, head_dim)
 print("Reshaped: ", xq.shape, xk.shape, xv.shape)
 
 # Rotary Position Embeddings
+xq = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
+xk = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
+print(f'xq: {xq.shape}\n{xq}\n')
+print(f'xq: {xk.shape}\n{xq}\n')
+
+ndim = xq.ndim
+assert 0 <= 1 < ndim
+assert freqs_cis.shape == (xq.shape[1], xq.shape[-1]), f'freqs_cis.shape {freqs_cis.shape} != xq.shape[1], xq.shape[-1] {(xq.shape[1], xq.shape[-1])}'
+
+shape = [d if i == 1 or i == xq.ndim - 1 else 1 for i, d in enumerate(xq.shape)]
+print(f'shape: {shape}\n')
+
+freqs_cis = freqs_cis.view(*shape)
+print(f'freqs_cis: {freqs_cis.shape}\n{freqs_cis}')
+
+# multiply data * freq
+xq = torch.view_as_real(xq * freqs_cis).flatten(3).type_as(xv)
+xk = torch.view_as_real(xk * freqs_cis).flatten(3).type_as(xv)
+print(f'xq: {xq.shape}\n{xq}\n')
+print(f'xk: ')
