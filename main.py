@@ -25,7 +25,7 @@ x = embedding(tokens)
 print(x.shape, x)
 
 
-# Precopmuting RoPE Frequences
+# Precompting RoPE Frequences
 
 theta = 10000
 num_heads = 4
@@ -42,3 +42,22 @@ print(f'freqs: {freqs.shape}\n{freqs}\n')
 
 freqs_cis = torch.polar(torch.ones_like(freqs), freqs)[: seq_len]
 print(f'freqs_cis:{freqs_cis.shape}\n{freqs_cis}')
+
+
+# Percomputing Causal Mask
+
+mask = torch.full(
+    (seq_len, seq_len),
+    float("-inf")
+)
+
+mask = torch.triu(mask, diagonal=1)
+print(mask)
+
+# Normalisation
+
+h = x
+print(f'h: {h.shape}\n{h}')
+
+mean_squared = x.pow(2).mean(dim=-1, keepdim = True)
+print(mean_squared)
