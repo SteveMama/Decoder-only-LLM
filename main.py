@@ -87,3 +87,31 @@ class RMSNorm(torch.nn.Module):
     def forward(self, x):
         output = self._norm(x.float()).type_as(x)
         return output * self.weight
+
+## Multi-Query Attention
+
+print(h, x_normed)
+
+num_kv_heads = 2
+assert num_heads % num_kv_heads ==0
+print(f"as a reminder: num_heads = {num_heads}, head_dim = {head_dim}")
+
+
+# initialisation of Self-attention weight matrices
+
+wq = nn.Linear(d, num_heads * head_dim, bias = False)
+wk = nn.Linear(d, num_kv_heads * head_dim, bias = False)
+wv = nn.Linear(d, num_kv_heads * head_dim, bias = False)
+print("Attention Weights: ", wq.weight.shape, wk.weight.shape, wv.weight.shape)
+
+xq = wq(x_normed)
+xk = wk(x_normed)
+xv = wv(x_normed)
+print("Attention Projections: ", xq.shape, xk.shape, xv.shape)
+
+xq = xq.view(b, seq_len, num_heads, head_dim)
+xk = xk.view(b, seq_len, num_kv_heads, head_dim)
+xv = xv.view(b, seq_len, num_kv_heads, head_dim)
+print("Reshaped: ", xq.shape, xk.shape, xv.shape)
+
+# Rotary Position Embeddings
