@@ -61,3 +61,29 @@ print(f'h: {h.shape}\n{h}')
 
 mean_squared = x.pow(2).mean(dim=-1, keepdim = True)
 print(mean_squared)
+
+x_normed = x * torch.rsqrt(mean_squared + 1e-6)
+print(f'x_normed: {x_normed.shape}\n{x_normed }')
+
+# RMS Scale
+
+rms_scale = torch.ones(d)
+print(f'rms_scale:{rms_scale.shape}\n{rms_scale}\n')
+
+x_normed *= rms_scale
+print(f'x_normed: {x_normed.shape}\n{x_normed}')
+
+# RMSNorm
+
+class RMSNorm(torch.nn.Module):
+    def __init__(self, dim: int, eps: float = 1e-6):
+        super().__init__()
+        self.eps = eps
+        self.weight = nn.Parameter(torch.ones(dim))
+
+    def _norm(self, x):
+        return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
+
+    def forward(self, x):
+        output = self._norm(x.float()).type_as(x)
+        return output * self.weight
