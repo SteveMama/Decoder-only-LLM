@@ -163,3 +163,63 @@ print(scores.shape, scores)
 
 scores = F.softmax(scores.float(), dim =-1).type_as(xq)
 print(scores)
+
+output = torch.matmul(scores, xv)
+print(output.shape, output)
+
+output = output.transpose(1,2).contiguous().view(b, seq_len, -1)
+print(output.shape, output)
+
+wo = nn.Linear(num_heads * head_dim, d, bias = False)
+Xout = wo(output)
+print(Xout.shape, Xout)
+
+# Building Residual Connection
+
+post_attn_norm = RMSNorm(d)
+h += post_attn_norm(Xout)
+print(h.shape, h)
+
+pre_ffwd_norm = RMSNorm(d)
+h_normed = pre_ffwd_norm(h)
+
+# Implementing SwiGLU Feedforward Network
+
+hidden_dim = 4 * d
+print(hidden_dim)
+hidden_dim = int(2 * hidden_dim / 3)
+print(hidden_dim)
+multiple_of = 256
+hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
+print(hidden_dim)
+
+up = nn.Linear(d, hidden_dim, bias = False)
+gate = nn.Linear(d, hidden_dim, bias = False)
+down = nn.Linear(hidden_dim, d, bias = False)
+
+up_proj = up(h_normed)
+print(up_proj.shape, up_proj)
+
+gate_proj = F.silu(gate(h_normed))
+print(gate_proj.shape, gate_proj)
+
+ffwd_output = down(up_proj * gate_proj)
+print(ffwd_output.shape, ffwd_output)
+
+out = h + ffwd_output
+print(out.shape, out)
+
+# Output calculation
+
+final_norm = RMSNorm(d)
+out_normed = final_norm(out)
+
+final_output = nn.Linear(d, v, bias = False)
+logits = final_output(out_normed).float()
+print(logits.shape, logits)
+
+probs = F.softmax(logits, dim =-1)
+print(probs)
+
+greedy_indices = torch.argmax(probs, dim = -1)
+print(greedy_indices)
