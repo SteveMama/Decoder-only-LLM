@@ -134,4 +134,32 @@ print(f'freqs_cis: {freqs_cis.shape}\n{freqs_cis}')
 xq = torch.view_as_real(xq * freqs_cis).flatten(3).type_as(xv)
 xk = torch.view_as_real(xk * freqs_cis).flatten(3).type_as(xv)
 print(f'xq: {xq.shape}\n{xq}\n')
-print(f'xk: ')
+print(f'xk: {xk.shape}\n {xk}\n')
+
+
+# Calculating Self-Attention
+
+if num_kv_heads != num_heads:
+    num_queries_per_kv = num_heads // num_kv_heads
+    xk = torch.repeat_interleave(xk, num_queries_per_kv, dim = 2)
+    xv = torch.repeat_interleave(xv, num_queries_per_kv, dim =2)
+
+print(xq.shape, xk.shape, xv.shape)
+
+xq = xq.transpose(1, 2)
+xk = xk.transpose(1, 2)
+xv = xv.transpose(1, 2)
+
+scores = torch.matmul(xq, xk.transpose(2,3))
+
+scores = scores / math.sqrt(head_dim)
+
+print(scores.shape, scores)
+
+# Masks
+
+scores = scores + mask
+print(scores.shape, scores)
+
+scores = F.softmax(scores.float(), dim =-1).type_as(xq)
+print(scores)
