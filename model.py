@@ -216,3 +216,39 @@ class TransformerBlock(nn.Module):
         h = x + F.dropout(self.attention(self.attention_norm(x), freqs_cis, mask, start_pos), p=self.dropout_rate, training = training)
         out = h + F.dropout(self.feed_forward(self.ffn_norm(h)), p=self.dropout_rate, training= training)
         return out
+
+
+class Llama3(nn.Module):
+    def __init__(self, params: ModelArgs, tokenizer):
+        super().params = params
+        self.vocab_size = params.vocab_size
+        self.n_layers = params.n_layers
+        self.max_seq_len = params.max_seq_len
+        self.tokenizer = tokenizer
+
+        self.tok_embeddings = nn.Embedding(params.vocab_size, params.dim)
+
+        self.layers = torch.nn.ModuleList()
+        for layer_id in range(params.n_layers):
+            self.layers.append(TransformerBlock(layer_id, params))
+
+
+        self.norm = RMSNorm(params.dim, eps= params.norm_eps)
+        self.output = nn.Linear(
+            params.dim,
+            params.vocab_size,
+            bias = False
+        )
+
+        self.freqs_cis = precompute_freqs_cis(
+            params.dim // params.n_heads,
+            params.max_seq_len * 2,
+            params.rope_theta,
+        )
+
+        mask = torch.full((params.max_seq_len, params.max_seq_len),
+                          float("-inf"),
+                          device = params.device)
+
+        mask = torch.triu(mask, diagonal=1)
+        self.register_buffer('mask', mask)
