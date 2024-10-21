@@ -223,3 +223,24 @@ print(probs)
 
 greedy_indices = torch.argmax(probs, dim = -1)
 print(greedy_indices)
+
+# Loss functions
+
+target_token_indices = torch.randint(0, v, greedy_indices.shape)
+print(target_token_indices)
+
+loss_fn = nn.CrossEntropyLoss()
+
+loss = loss_fn(logits.view(1, v, seq_len), target_token_indices)
+print(loss)
+
+
+# SwiGLU Activation function
+
+def swiGLU(x):
+    deno = (1 + math.exp(-1.702 * x))
+    y = (1 / deno)
+
+    return y
+
+print(swiGLU(0.52))
