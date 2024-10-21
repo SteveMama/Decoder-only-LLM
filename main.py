@@ -243,4 +243,4 @@ def swiGLU(x):
 
     return y
 
-print(swiGLU(0.52))
+print("testing out swiGLU", swiGLU(0.52))
