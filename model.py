@@ -91,5 +91,46 @@ def repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
 class Attention(nn.Module):
     def __init__(self, args: ModelArgs):
         super().__init__()
-        self.
+        self.n_heads = args.n_heads
+        self.n_kv_heads = args.n_heads if args.n_kv_heads is None else args.n_kv_heads
+        self.n_rep = args.n_heads // self.n_kv_heads
+        self.head_dim = args.dim // args.n_heads
+
+        self.wq = nn.Linear(args.dim, args.n_heads * self.head_dim, bias = False)
+        self.wk = nn.Linear(args.dim, self.n_kv_heads * self.head_dim, bias = False)
+        self.wv = nn.Linear(args.dim, self.n_kv_heads * self.head_dim, bias = False)
+        self.wo = nn.Linear(args.n_heads * self.head_dim,args.dim, bias = False)
+
+        self.cache_k = torch.zeros(
+            (args.max_batch_size, args.max_seq_len, self.n_kv_heads, self.head_dim),
+            requires_grad=False
+        ).to(args.device)
+
+        self.cache_v = torch.zeros(
+            (args.max_batch_size, args.max_seq_len, self. n_kv_heads, self.head_dim),
+            requires_grad= False
+        ).to(args.device)
+
+    def forward(
+            self,
+            x: torch.Tensor,
+            freqs_cis: torch.Tensor,
+            mask: Optional[torch.Tensor],
+            start_pos: int = None,
+    ):
+        bsz, seqlen, _ = x.shape
+        xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
+
+        xq = xq.view(bsz, seqlen, self.n_heads, self.head_dim)
+        xk = xk.view(bsz, seqlen, self.n_kv_heads, self.head_dim)
+        xv = xv.view(bsz, seqlen, self.n_kv_heads, self.head_dim)
+
+        xq, xk = apply_rotary_emb(xq, xk, freqs_cis=freqs_cis)
+
+        if start_pos is not None:
+
+            self.cache_k = self.cache_k.to(xq)
+
+
+
 
