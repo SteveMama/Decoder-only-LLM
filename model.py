@@ -184,3 +184,35 @@ class FeedForward(nn.Module):
         return self.w2(F.silu(self.w1(x)) * self.w3(x))
 
 
+# Residual Layers
+
+class TransformerBlock(nn.Module):
+    def __init__(self, layer_id: int, args: ModelArgs):
+        super().__init__()
+        self.n_heads = args.n_heads
+        self.dim = args.dim
+        self.head_dim = args.dim // args.n_heads
+        self.attention = Attention(args)
+        self.feed_forward = FeedForward(
+            dim = args.dim,
+            hidden_dim=4 * args.dim,
+            multiple_of=args.multiple_of,
+            ffn_dim_multiplier=args.ffn_dim_multiplier,
+        )
+
+        self.layer_id = layer_id
+        self.attention_norm = RMSNorm(args.dim, eps = args.norm_eps)
+        self.ffn_norm = RMSNorm(args.dim, eps = args.norm_eps)
+        self.dropout_rate = args.dropout_rate
+
+    def forward(
+            self,
+            x: torch.Tensor,
+            freqs_cis : torch.Tensor,
+            mask: Optional[torch.Tensor],
+            start_pos: int = None,
+            training = False,
+    ):
+        h = x + F.dropout(self.attention(self.attention_norm(x), freqs_cis, mask, start_pos), p=self.dropout_rate, training = training)
+        out = h + F.dropout(self.feed_forward(self.ffn_norm(h)), p=self.dropout_rate, training= training)
+        return out
