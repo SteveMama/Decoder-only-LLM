@@ -252,3 +252,157 @@ class Llama3(nn.Module):
 
         mask = torch.triu(mask, diagonal=1)
         self.register_buffer('mask', mask)
+
+        self.criterion = nn.CrossEntropyLoss()
+
+    def forward(self,
+                tokens: torch.Tensor,
+                targets: torch.Tensor):
+        bsz, seqlen = tokens.shape
+        assert tokens.shape == targets.shape
+        assert seqlen == self.max_seq_len
+
+        h = self.tok_embeddings(tokens)
+
+        freqs_cis = self.freqs_cis.to(h.device)
+        freqs_cis = self.freqs_cis[: seqlen]
+
+        for layer in self.layers:
+            h = layer(
+                h,
+                freqs_cis,
+                self.mask,
+                start_pos = None,
+                training = True
+            )
+
+        h = self.norm(h)
+        logits = self.output(h).float()
+
+        loss = self.criterion(
+            logits.view(bsz * seqlen, self.vocab_size),
+            targets.reshape(bsz * seqlen))
+
+        return logits, loss
+
+
+    @torch.inference_mode()
+    def forward_inference(self,
+                              tokens: torch.Tensor,
+                              start_pos: int,
+                              max_context_window: int,
+                              ):
+        _bsz, seqlen = tokens.shape
+        h = self.tok_embeddings(tokens)
+        self.freqs_cis = self.freqs_cis.to(h.device)
+        freqs_cis = self.freqs_cis[start_pos: start_pos + seqlen]
+
+        mask = self.mask[: seqlen, :seqlen]
+
+        mask = torch.hstack(
+            [torch.zeroes((seqlen, start_pos), device = tokens.device), mask]
+        ).type_as(h)
+
+        for layer in self.layers:
+            h = layer(
+                h,
+                freqs_cis,
+                mask,
+                start_pos = start_pos
+            )
+
+        h = self.norm(h)
+        logits = self.output(h).float()
+        return logits
+
+    @torch.inference_mode()
+    def Sampler(self,
+                logits: torch.Tensor,
+                temperature: float,
+                top_p: float,
+                top_k : int,
+    )-> torch.Tensor:
+
+        logits = logits[:, -1, :] #batch_size, input_len, vocab_size
+
+        logits.div_(temperature)
+
+        probs = torch.softmax(logits, dim=-1, dtype=torch.float)
+
+        probs_sort, probs_idx = torch.sort(probs, dim =-1, descending= True)
+        probs_sum = torch.cumsum(probs_sort, dim=-1)
+
+        top_ps_mask = (probs_sum - probs_sort) > top_p
+
+        probs_sort = torch.where(top_ps_mask, 0, probs_sort)
+
+        # We calculate top_k here
+
+        top_ks_mask = torch.arange(probs_idx.shape[-1], device=probs_idx.device)
+
+        top_ks_mask = top_ks_mask.expand(probs_idx.shape[0], -1)
+        top_ks_mask = top_ks_mask >= top_k
+
+        probs_sort = torch.where(top_ks_mask, 0, probs_sort)
+
+        probs_sort.div_(probs_sort.sum(dim=-1, keepdime = True))
+
+        probs = torch.gather(probs_sort, dim=-1, index=torch.argsort(probs_idx, dim=-1))
+
+        next_token_id = torch.multinomial(probs, num_samples=1)
+
+        return next_token_id
+
+
+    @torch.inference_mode()
+    def generate(self,
+                 prompt: str,
+                 max_gen_len: int =None,
+                 memory_saver_div: int=1,
+                 temperature: float =0.6,
+                 top_p: float = 0.9,
+                 top_k: int = tokenizer.vocab_len,
+        ) -> str:
+
+        assert ((memory_saver_div & (memory_saver_div-1)) == 0) & (memory_saver_div > 0), f'memory_saver_div {memory_saver_div} must be power of 2'
+        max_context_window = self.max_seq_len // memory_saver_div
+        if max_context_window < self.max_seq_len:
+            assert ((memory_saver_div & (memory_saver_div - 1)) == 0) & (
+                        memory_saver_div > 0), f'memory_saver_div {memory_saver_div} must be power of 2'
+
+        tokens = self.tokenizer.encode(prompt)
+
+        if max_gen_len is None:
+            self.max_seq_len - len(tokens)
+        elif max_gen_len + len(tokens) > self.max_seq_len:
+            print(f'capping max_gen_len at max_seq_len={self.max_seq_len} including input\n')
+            max_gen_len = self.max_seq_len - len(tokens)
+
+        tokens = torch.tensor(tokens, device = self.params.device)
+        tokens = tokens.unsqueeze(0) if len(tokens.shape) ==1 else tokens
+
+        start_pos = max(tokens.shape[1] - max_context_window, 0)
+
+        for i in range(max_gen_len):
+            logits = self.forward_inference(
+                tokens[:, -max_context_window:],
+                start_pos = start_pos,
+                max_context_window=max_context_window
+            )
+
+            next_token = self.Sampler(
+                logits = logits,
+                temperature = temperature,
+                top_p = top_p,
+                top_k = top_k
+            )
+
+            tokens = torch.cat((tokens, next_token), dim = 1)
+
+            if tokens.shape[1] >= max_context_window:
+                start_pos +=1
+
+        output = self.tokenizer.decode(tokens.squeeze(0).tolist())
+
+        return output
+
