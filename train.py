@@ -88,4 +88,23 @@ scheduler = torch.optim.lr_scheduler.lambdaLR(optimizer, lr_lambda)
 
 # training script
 
+start_time = time.time()
+
+for iter in range(max_iters):
+
+    xb, yb = get_batch('train', params.max_batch_size)
+
+    logits, loss = model(xb, targets = yb)
+    optimizer.zero_grad(set_to_none=True)
+    loss.backward()
+    optimizer.step()
+
+    scheduler.step()
+
+    if iter % eval_interval == 0 or iter == max_iters - 1 :
+        current_time = time.time()
+        elasped_time = current_time - start_time
+        losses = estimate_loss(model, params.max_batch_size)
+        current_lr = optimizer.params_groups[0]['lr']
+        print(f"step {iter:04d}: lr {current_lr:.6f}, train loss {losses['train']:.4f}, val loss {losses['val']:.4f}, time elapsed: {elapsed_time:.2f} seconds")
 
