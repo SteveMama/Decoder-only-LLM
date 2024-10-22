@@ -50,12 +50,13 @@ class RMSNorm(torch.nn.Module):
 
 # RoPE
 
-def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0):
+def precompute_freqs_cis(dim: int, end: int, device: str, theta: float = 10000.0):
     freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
-    t = torch.arange(end, device = freqs.device, dtype = torch.float32)
+    t = torch.arange(end, device=device, dtype=torch.float32)
     freqs = torch.outer(t, freqs)
-    freqs_cis = torch.polar(torch.ones_like(freqs), freqs)
-    return freqs_cis.to(params.device)
+    freqs_cis = torch.polar(torch.ones_like(freqs), freqs)  # complex64
+    return freqs_cis.to(device)
+
 
 def reshape_for_broadcast(freqs_cis: torch.Tensor, x: torch.Tensor):
     ndim = x.ndim
@@ -244,6 +245,7 @@ class Llama3(nn.Module):
         self.freqs_cis = precompute_freqs_cis(
             params.dim // params.n_heads,
             params.max_seq_len * 2,
+            params.device,
             params.rope_theta,
         )
 

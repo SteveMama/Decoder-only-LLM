@@ -47,18 +47,19 @@ def get_batch(split, batch_size):
     return x, y
 
 @torch.no_grad()
-def estimate_loss(model, batch_size, eval_iters = 5):
+def estimate_loss(model, batch_size, eval_iters=5):
     out = {}
     model.eval()
     for split in ['train', 'val']:
         losses = torch.zeros(eval_iters)
         for k in range(eval_iters):
             X, Y = get_batch(split, batch_size)
-            logits, loss = model(X, targets = Y)
-            loss[k] = loss.item()
-        out[split] = losses.mean()
+            logits, loss = model(X, targets=Y)
+            losses[k] = loss.item()
+        out[split] = losses.mean().item()
     model.train()
     return out
+
 
 
 # Optimizer
@@ -84,7 +85,7 @@ def lr_lambda(current_iter):
         cosine_decay = 0.5 * (1 + math.cos(math.pi * (current_iter - warmup_iters) / decay_iters))
         return max(cosine_decay, lr_final / lr_init)
 
-scheduler = torch.optim.lr_scheduler.lambdaLR(optimizer, lr_lambda)
+scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
 # training script
 
@@ -105,6 +106,6 @@ for iter in range(max_iters):
         current_time = time.time()
         elasped_time = current_time - start_time
         losses = estimate_loss(model, params.max_batch_size)
-        current_lr = optimizer.params_groups[0]['lr']
-        print(f"step {iter:04d}: lr {current_lr:.6f}, train loss {losses['train']:.4f}, val loss {losses['val']:.4f}, time elapsed: {elapsed_time:.2f} seconds")
+        current_lr = optimizer.param_groups[0]['lr']
+        print(f"step {iter:04d}: lr {current_lr:.6f}, train loss {losses['train']:.4f}, val loss {losses['val']:.4f}, time elapsed: {elasped_time:.2f} seconds")
 
