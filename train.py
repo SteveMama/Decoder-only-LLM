@@ -46,5 +46,19 @@ def get_batch(split, batch_size):
     x, y = x.to(params.device), y.to(params.device)
     return x, y
 
+@torch.no_grad()
+def estimate_loss(model, batch_size, eval_iters = 5):
+    out = {}
+    model.eval()
+    for split in ['train', 'val']:
+        losses = torch.zeros(eval_iters)
+        for k in range(eval_iters):
+            X, Y = get_batch(split, batch_size)
+            logits, loss = model(X, targets = Y)
+            loss[k] = loss.item()
+        out[split] = losses.mean()
+    model.train()
+    return out
+
 
 
