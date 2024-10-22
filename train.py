@@ -61,4 +61,31 @@ def estimate_loss(model, batch_size, eval_iters = 5):
     return out
 
 
+# Optimizer
+
+lr_init = 1e-2
+weight_decay = 0.02
+optimizer = torch.optim.AdamW(model.parameters(), lr=lr_init, weight_decay= weight_decay)
+
+max_iters = 1000
+
+eval_interval = 50
+
+warmup_iters = 10
+warmup_factor = 1e-3
+
+lr_final = 1e-5
+
+def lr_lambda(current_iter):
+    if current_iter < warmup_iters:
+        return warmup_factor + (1 - warmup_factor) * current_iter / warmup_iters
+    else:
+        decay_iters = max_iters - warmup_iters
+        cosine_decay = 0.5 * (1 + math.cos(math.pi * (current_iter - warmup_iters) / decay_iters))
+        return max(cosine_decay, lr_final / lr_init)
+
+scheduler = torch.optim.lr_scheduler.lambdaLR(optimizer, lr_lambda)
+
+# training script
+
 
