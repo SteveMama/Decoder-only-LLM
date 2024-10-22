@@ -1,4 +1,6 @@
 import os
+from main import *
+from model import *
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -24,4 +26,25 @@ n = int(0.9 * len(data))
 
 train_data = data[:n]
 val_data = data[n:]
+
+# Training the model
+
+params = ModelArgs()
+print(params)
+model = Llama3(params, tokenizer).to(params.device)
+
+print(model)
+
+
+# preparing a batch
+
+def get_batch(split, batch_size):
+    data = train_data if split == 'train' else val_data
+    ix = torch.randint(len(data) - params.max_seq_len, (batch_size,))
+    x = torch.stack([data[i:i + params.max_seq_len] for i in ix])
+    y = torch.stack([data[i + 1:i + params.max_seq_len + 1] for i in ix])
+    x, y = x.to(params.device), y.to(params.device)
+    return x, y
+
+
 

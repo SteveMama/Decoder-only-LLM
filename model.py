@@ -220,7 +220,8 @@ class TransformerBlock(nn.Module):
 
 class Llama3(nn.Module):
     def __init__(self, params: ModelArgs, tokenizer):
-        super().params = params
+        super().__init__()
+        self.params = params
         self.vocab_size = params.vocab_size
         self.n_layers = params.n_layers
         self.max_seq_len = params.max_seq_len
